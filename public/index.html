@@ -78,33 +78,33 @@
         </section>
     </main>
 
-    <script>
-        // Conexión Socket.IO al puerto activo
+<script>
+        // Conexión Socket.IO con ruta relativa (se adapta a localhost o Render automáticamente)
         const socket = io();
         
-        // Cargar incidentes desde la API REST
+        // Cargar incidentes usando ruta relativa
         async function loadIncidents() {
             try {
                 const res = await fetch('/api/v1/incidentes');
                 const data = await res.json();
                 const list = document.getElementById('incident-list');
                 list.innerHTML = '';
-                if(!data || data.length === 0) {
+                
+                if (!data || data.length === 0) {
                     list.innerHTML = '<li>No hay incidentes reportados en la base de datos.</li>';
                     return;
                 }
+                
                 data.forEach(inc => {
                     const li = document.createElement('li');
                     li.innerHTML = `<strong>[ID ${inc.id_incidente}] ${inc.titulo}</strong> - ${inc.descripcion} <em>(${new Date(inc.fecha_registro).toLocaleString()})</em>`;
                     list.appendChild(li);
                 });
             } catch (err) {
-                console.error('Error al cargar datos:', err);
+                console.error('Error al conectar con la API:', err);
                 document.getElementById('incident-list').innerHTML = '<li>Error al conectar con la API REST.</li>';
             }
         }
 
         loadIncidents();
     </script>
-</body>
-</html>
