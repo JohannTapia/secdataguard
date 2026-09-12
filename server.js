@@ -12,48 +12,75 @@ const io = new Server(server, { cors: { origin: "*" } });
 app.use(cors());
 app.use(express.json());
 
-// Servir archivos estáticos del frontend si existen en la carpeta 'public'
+// Servir archivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configuración de conexión a SQL Server
+// Estado de conexión a BD
+let isDbConnected = false;
+
+// Datos Mock para cuando la base de datos cloud no esté disponible
+const mockIncidentes = [
+    {
+        id_incidente: 1,
+        titulo: "Infección de Ransomware (Modo Cloud)",
+        descripcion: "Detección de ejecutable malicioso en servidor principal.",
+        id_categoria: 1,
+        id_usuario_registra: 1,
+        fecha_registro: new Date().toISOString()
+    }
+];
+
+// Configuración de conexión
 const dbConfig = {
-    user: 'node_app',
-    password: 'SecData2026*',
-    server: '127.0.0.1',
-    port: 1433,
-    database: 'secdataguard',
+    user: process.env.DB_USER || 'node_app',
+    password: process.env.DB_PASSWORD || 'SecData2026*',
+    server: process.env.DB_SERVER || '127.0.0.1',
+    port: parseInt(process.env.DB_PORT) || 1433,
+    database: process.env.DB_DATABASE || 'secdataguard',
     options: {
         encrypt: false,
-        trustServerCertificate: true
+        trustServerCertificate: true,
+        connectTimeout: 5000 // Timeout corto para no congelar la app
     }
 };
 
-// Conexión a la base de datos
+// Intento de conexión
 sql.connect(dbConfig)
-    .then(() => console.log('Conectado a SQL Server exitosamente.'))
-    .catch(err => console.error('Error conectando a BD:', err));
+    .then(() => {
+        isDbConnected = true;
+        console.log('Conectado a SQL Server exitosamente.');
+    })
+    .catch(err => {
+        isDbConnected = false;
+        console.log('Servidor iniciado en modo Cloud Fallback (Sin SQL Server local).');
+    });
 
-// Servir la interfaz gráfica principal
+// Ruta principal
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Endpoint API REST: Obtener incidentes
 app.get('/api/v1/incidentes', async (req, res) => {
-    try {
-        const result = await sql.query('SELECT * FROM INCIDENTES');
-        res.json(result.recordset);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+    if (isDbConnected) {
+        try {
+            const result = await sql.query('SELECT * FROM INCIDENTES');
+            return res.json(result.recordset);
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    } else {
+        // Respuesta fallback para la nube
+        return res.json(mockIncidentes);
     }
 });
 
-// Evento Socket.IO en tiempo real
+// WebSockets
 io.on('connection', (socket) => {
     console.log('Cliente conectado vía WebSockets:', socket.id);
 });
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`Servidor corriendo en puerto ${PORT}`);
 });
