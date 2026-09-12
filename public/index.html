@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecDataGuard - Monitoreo de Seguridad</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo">SecDataGuard 🛡️</div>
+        <div class="user-info">
+            <span id="user-role">Perfil: Analista de Ciberseguridad</span>
+            <button class="btn-secondary" onclick="alert('Sesión cerrada')">Cerrar Sesión</button>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Formulario 1: Autenticación y Cuentas -->
+        <section class="card">
+            <h2>Acceso al Sistema</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="email">Correo Electrónico:</label>
+                    <input type="email" id="email" required placeholder="analista@secdataguard.cl">
+                </div>
+                <div class="form-group">
+                    <label for="password">Contraseña Cifrada:</label>
+                    <input type="password" id="password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn-primary">Iniciar Sesión</button>
+            </form>
+        </section>
+
+        <!-- Formulario 2: Ingesta de Incidentes de Seguridad -->
+        <section class="card">
+            <h2>Registrar Nuevo Incidente</h2>
+            <form id="incident-form">
+                <div class="form-group">
+                    <label for="titulo">Título de la Amenaza:</label>
+                    <input type="text" id="titulo" required placeholder="Ej: Intento de Inyección SQL detectado">
+                </div>
+                <div class="form-group">
+                    <label for="categoria">Categoría de Amenaza:</label>
+                    <select id="categoria" required>
+                        <option value="1">Fuerza Bruta</option>
+                        <option value="2">Inyección SQL</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="descripcion">Detalle Técnico:</label>
+                    <textarea id="descripcion" rows="3" required placeholder="Describa el vector de ataque..."></textarea>
+                </div>
+                <button type="submit" class="btn-primary">Guardar e Informar Sincrónicamente</button>
+            </form>
+        </section>
+
+        <!-- Formulario 3: Recuperación de Credenciales -->
+        <section class="card">
+            <h2>Recuperación de Credenciales</h2>
+            <form id="recover-form">
+                <div class="form-group">
+                    <label for="recover-email">Correo de Recuperación:</label>
+                    <input type="email" id="recover-email" required placeholder="usuario@empresa.cl">
+                </div>
+                <button type="submit" class="btn-secondary">Enviar Enlace Seguro (SMTP)</button>
+            </form>
+        </section>
+
+        <!-- Panel de Monitoreo Dinámico -->
+        <section class="card full-width">
+            <h2>Eventos e Incidentes Registrados (Tiempo Real)</h2>
+            <div id="status-alert" class="alert hidden">Nuevas amenazas registradas sincrónicamente</div>
+            <ul id="incident-list" class="data-list">
+                <li>Cargando incidentes desde SQL Server...</li>
+            </ul>
+        </section>
+    </main>
+
+    <script>
+        // Conexión Socket.IO al puerto activo
+        const socket = io();
+        
+        // Cargar incidentes desde la API REST
+        async function loadIncidents() {
+            try {
+                const res = await fetch('/api/v1/incidentes');
+                const data = await res.json();
+                const list = document.getElementById('incident-list');
+                list.innerHTML = '';
+                if(!data || data.length === 0) {
+                    list.innerHTML = '<li>No hay incidentes reportados en la base de datos.</li>';
+                    return;
+                }
+                data.forEach(inc => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>[ID ${inc.id_incidente}] ${inc.titulo}</strong> - ${inc.descripcion} <em>(${new Date(inc.fecha_registro).toLocaleString()})</em>`;
+                    list.appendChild(li);
+                });
+            } catch (err) {
+                console.error('Error al cargar datos:', err);
+                document.getElementById('incident-list').innerHTML = '<li>Error al conectar con la API REST.</li>';
+            }
+        }
+
+        loadIncidents();
+    </script>
+</body>
+</html>
