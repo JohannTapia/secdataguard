@@ -78,10 +78,10 @@
         </section>
     </main>
 
-<script>
+    <script>
         const socket = io();
 
-        // Cargar incidentes al entrar
+        // 1. Cargar incidentes iniciales desde la API REST
         async function loadIncidents() {
             try {
                 const res = await fetch('/api/v1/incidentes');
@@ -89,6 +89,8 @@
                 renderList(data);
             } catch (err) {
                 console.error('Error al conectar con la API:', err);
+                const list = document.getElementById('incident-list');
+                if (list) list.innerHTML = '<li>Error al conectar con la API REST.</li>';
             }
         }
 
@@ -97,6 +99,11 @@
             if (!list) return;
             list.innerHTML = '';
             
+            if (!incidentes || incidentes.length === 0) {
+                list.innerHTML = '<li>No hay incidentes registrados.</li>';
+                return;
+            }
+
             incidentes.forEach(inc => {
                 const li = document.createElement('li');
                 li.style.marginBottom = "8px";
@@ -105,57 +112,60 @@
             });
         }
 
-        // 1. ESCHUCHAR RECEPCIÓN EN TIEMPO REAL VÍA WEBSOCKETS
+        // 2. Escuchar recepción en tiempo real vía WebSockets
         socket.on('nuevo_incidente', (incidente) => {
             const list = document.getElementById('incident-list');
             if (list) {
+                // Remover mensaje vacío si existe
+                if (list.children.length === 1 && list.children[0].textContent.includes('No hay incidentes')) {
+                    list.innerHTML = '';
+                }
+
                 const li = document.createElement('li');
                 li.style.marginBottom = "8px";
-                li.style.color = "#007bff"; // Resaltar el nuevo recibido
+                li.style.color = "#0056b3"; // Resaltar el nuevo recibido en azul
+                li.style.fontWeight = "500";
                 li.innerHTML = `<strong>[ID ${incidente.id_incidente}] ${incidente.titulo}</strong> - ${incidente.descripcion} <em>(${new Date(incidente.fecha_registro).toLocaleTimeString()})</em>`;
+                
                 list.insertBefore(li, list.firstChild);
             }
         });
 
-        // 2. ENVIAR FORMULARIO AL HACER CLIC EN EL BOTÓN
+        // 3. Capturar el submit del formulario e interactuar con la API REST
         document.addEventListener('DOMContentLoaded', () => {
             loadIncidents();
 
-            const btnGuardar = document.querySelector('button[type="button"], .btn-primary, button');
-            // Si tus inputs tienen IDs o selecciones por selector:
-            const formBtn = document.querySelector('form');
-
-            if (formBtn) {
-                formBtn.addEventListener('submit', async (e) => {
+            const incidentForm = document.getElementById('incident-form');
+            if (incidentForm) {
+                incidentForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
-                    await enviarIncidente();
+                    
+                    const tituloInput = document.getElementById('titulo');
+                    const descripcionInput = document.getElementById('descripcion');
+
+                    const titulo = tituloInput.value.trim();
+                    const descripcion = descripcionInput.value.trim();
+
+                    if (!titulo || !descripcion) return;
+
+                    try {
+                        const response = await fetch('/api/v1/incidentes', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ titulo, descripcion })
+                        });
+
+                        if (response.ok) {
+                            // Limpiar los inputs tras registrar con éxito
+                            tituloInput.value = '';
+                            descripcionInput.value = '';
+                        }
+                    } catch (err) {
+                        console.error('Error al enviar el incidente:', err);
+                    }
                 });
-            } else {
-                // Si el botón está suelto sin etiqueta <form>
-                const btn = document.querySelectorAll('button')[1]; // El botón azul del medio
-                if (btn) {
-                    btn.addEventListener('click', enviarIncidente);
-                }
             }
         });
-
-        async function enviarIncidente() {
-            const inputs = document.querySelectorAll('input, select, textarea');
-            let titulo = "";
-            let detalle = "";
-
-            inputs.forEach(input => {
-                if (input.placeholder && input.placeholder.includes('Inyección')) titulo = input.value;
-                if (input.tagName === 'TEXTAREA') detalle = input.value;
-            });
-
-            if (!titulo) titulo = "Intento de Inyección SQL Detectado";
-            if (!detalle) detalle = "Ataque bloqueado por la capa de seguridad sincrónica.";
-
-            await fetch('/api/v1/incidentes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ titulo, descripcion: detalle })
-            });
-        }
     </script>
+</body>
+</html>
