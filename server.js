@@ -11,26 +11,20 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(cors());
 app.use(express.json());
-
-// Servir archivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Estado de conexión a BD
 let isDbConnected = false;
 
-// Datos Mock para cuando la base de datos cloud no esté disponible
+// Array en memoria para guardar e informar incidentes en la nube
 const mockIncidentes = [
     {
         id_incidente: 1,
         titulo: "Infección de Ransomware (Modo Cloud)",
         descripcion: "Detección de ejecutable malicioso en servidor principal.",
-        id_categoria: 1,
-        id_usuario_registra: 1,
         fecha_registro: new Date().toISOString()
     }
 ];
 
-// Configuración de conexión
 const dbConfig = {
     user: process.env.DB_USER || 'node_app',
     password: process.env.DB_PASSWORD || 'SecData2026*',
@@ -40,11 +34,10 @@ const dbConfig = {
     options: {
         encrypt: false,
         trustServerCertificate: true,
-        connectTimeout: 5000 // Timeout corto para no congelar la app
+        connectTimeout: 4000
     }
 };
 
-// Intento de conexión
 sql.connect(dbConfig)
     .then(() => {
         isDbConnected = true;
@@ -52,15 +45,14 @@ sql.connect(dbConfig)
     })
     .catch(err => {
         isDbConnected = false;
-        console.log('Servidor iniciado en modo Cloud Fallback (Sin SQL Server local).');
+        console.log('Servidor iniciado en modo Cloud Fallback.');
     });
 
-// Ruta principal
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Endpoint API REST: Obtener incidentes
+// GET: Obtener incidentes
 app.get('/api/v1/incidentes', async (req, res) => {
     if (isDbConnected) {
         try {
@@ -70,12 +62,37 @@ app.get('/api/v1/incidentes', async (req, res) => {
             return res.status(500).json({ error: err.message });
         }
     } else {
-        // Respuesta fallback para la nube
         return res.json(mockIncidentes);
     }
 });
 
-// WebSockets
+// POST: Registrar nuevo incidente desde el formulario
+app.post('/api/v1/incidentes', async (req, res) => {
+    const { titulo, descripcion } = req.body;
+    
+    const nuevoIncidente = {
+        id_incidente: mockIncidentes.length + 1,
+        titulo: titulo || "Amenaza Registrada",
+        descripcion: descripcion || "Sin detalle técnico proporcionado",
+        fecha_registro: new Date().toISOString()
+    };
+
+    if (isDbConnected) {
+        try {
+            await sql.query(`INSERT INTO INCIDENTES (titulo, descripcion) VALUES ('${nuevoIncidente.titulo}', '${nuevoIncidente.descripcion}')`);
+        } catch (err) {
+            console.error("Error guardando en BD:", err);
+        }
+    } else {
+        mockIncidentes.unshift(nuevoIncidente);
+    }
+
+    // EMISIÓN EN TIEMPO REAL VÍA WEBSOCKETS A TODOS LOS NAVEGADORES CONECTADOS
+    io.emit('nuevo_incidente', nuevoIncidente);
+
+    return res.status(201).json({ status: 'ok', data: nuevoIncidente });
+});
+
 io.on('connection', (socket) => {
     console.log('Cliente conectado vía WebSockets:', socket.id);
 });

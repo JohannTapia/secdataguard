@@ -79,32 +79,83 @@
     </main>
 
 <script>
-        // Conexión Socket.IO con ruta relativa (se adapta a localhost o Render automáticamente)
         const socket = io();
-        
-        // Cargar incidentes usando ruta relativa
+
+        // Cargar incidentes al entrar
         async function loadIncidents() {
             try {
                 const res = await fetch('/api/v1/incidentes');
                 const data = await res.json();
-                const list = document.getElementById('incident-list');
-                list.innerHTML = '';
-                
-                if (!data || data.length === 0) {
-                    list.innerHTML = '<li>No hay incidentes reportados en la base de datos.</li>';
-                    return;
-                }
-                
-                data.forEach(inc => {
-                    const li = document.createElement('li');
-                    li.innerHTML = `<strong>[ID ${inc.id_incidente}] ${inc.titulo}</strong> - ${inc.descripcion} <em>(${new Date(inc.fecha_registro).toLocaleString()})</em>`;
-                    list.appendChild(li);
-                });
+                renderList(data);
             } catch (err) {
                 console.error('Error al conectar con la API:', err);
-                document.getElementById('incident-list').innerHTML = '<li>Error al conectar con la API REST.</li>';
             }
         }
 
-        loadIncidents();
+        function renderList(incidentes) {
+            const list = document.getElementById('incident-list');
+            if (!list) return;
+            list.innerHTML = '';
+            
+            incidentes.forEach(inc => {
+                const li = document.createElement('li');
+                li.style.marginBottom = "8px";
+                li.innerHTML = `<strong>[ID ${inc.id_incidente}] ${inc.titulo}</strong> - ${inc.descripcion} <em>(${new Date(inc.fecha_registro).toLocaleTimeString()})</em>`;
+                list.appendChild(li);
+            });
+        }
+
+        // 1. ESCHUCHAR RECEPCIÓN EN TIEMPO REAL VÍA WEBSOCKETS
+        socket.on('nuevo_incidente', (incidente) => {
+            const list = document.getElementById('incident-list');
+            if (list) {
+                const li = document.createElement('li');
+                li.style.marginBottom = "8px";
+                li.style.color = "#007bff"; // Resaltar el nuevo recibido
+                li.innerHTML = `<strong>[ID ${incidente.id_incidente}] ${incidente.titulo}</strong> - ${incidente.descripcion} <em>(${new Date(incidente.fecha_registro).toLocaleTimeString()})</em>`;
+                list.insertBefore(li, list.firstChild);
+            }
+        });
+
+        // 2. ENVIAR FORMULARIO AL HACER CLIC EN EL BOTÓN
+        document.addEventListener('DOMContentLoaded', () => {
+            loadIncidents();
+
+            const btnGuardar = document.querySelector('button[type="button"], .btn-primary, button');
+            // Si tus inputs tienen IDs o selecciones por selector:
+            const formBtn = document.querySelector('form');
+
+            if (formBtn) {
+                formBtn.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await enviarIncidente();
+                });
+            } else {
+                // Si el botón está suelto sin etiqueta <form>
+                const btn = document.querySelectorAll('button')[1]; // El botón azul del medio
+                if (btn) {
+                    btn.addEventListener('click', enviarIncidente);
+                }
+            }
+        });
+
+        async function enviarIncidente() {
+            const inputs = document.querySelectorAll('input, select, textarea');
+            let titulo = "";
+            let detalle = "";
+
+            inputs.forEach(input => {
+                if (input.placeholder && input.placeholder.includes('Inyección')) titulo = input.value;
+                if (input.tagName === 'TEXTAREA') detalle = input.value;
+            });
+
+            if (!titulo) titulo = "Intento de Inyección SQL Detectado";
+            if (!detalle) detalle = "Ataque bloqueado por la capa de seguridad sincrónica.";
+
+            await fetch('/api/v1/incidentes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ titulo, descripcion: detalle })
+            });
+        }
     </script>
