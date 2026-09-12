@@ -3,37 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecDataGuard - Monitoreo de Seguridad</title>
+    <title>SecDataGuard - SOC Operations Platform</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
     <header class="navbar">
-        <div class="logo">SecDataGuard 🛡️</div>
+        <div class="logo">
+            🛡️ SecData<span>Guard</span>
+        </div>
         <div class="user-info">
-            <span id="user-role">Perfil: Analista de Ciberseguridad</span>
-            <button class="btn-secondary" onclick="alert('Sesión cerrada')">Cerrar Sesión</button>
+            <span id="user-role">Perfil: Visitante (No Autenticado)</span>
+            <button class="btn-secondary" onclick="cerrarSesion()">Cerrar Sesión</button>
         </div>
     </header>
 
+    <!-- Dashboard Metrics -->
+    <section class="metrics-container">
+        <div class="metric-card">
+            <h3>Estado del SOC</h3>
+            <div class="number" style="color: var(--success);">ONLINE</div>
+        </div>
+        <div class="metric-card">
+            <h3>Nivel de Riesgo</h3>
+            <div class="number" style="color: var(--warning);">MEDIO</div>
+        </div>
+        <div class="metric-card">
+            <h3>Incidentes Activos</h3>
+            <div class="number" id="active-incidents-count">2</div>
+        </div>
+        <div class="metric-card">
+            <h3>Sensores Conectados</h3>
+            <div class="number" style="color: var(--accent-cyan);">14/14</div>
+        </div>
+    </section>
+
     <main class="main-container">
-        <!-- Formulario 1: Autenticación y Cuentas -->
+        <!-- Formulario 1: Autenticación / Registro con Pestañas -->
         <section class="card">
-            <h2>Acceso al Sistema</h2>
-            <form id="login-form">
-                <div class="form-group">
-                    <label for="email">Correo Electrónico:</label>
-                    <input type="email" id="email" required placeholder="analista@secdataguard.cl">
-                </div>
-                <div class="form-group">
-                    <label for="password">Contraseña Cifrada:</label>
-                    <input type="password" id="password" required placeholder="••••••••">
-                </div>
-                <button type="submit" class="btn-primary">Iniciar Sesión</button>
-            </form>
+            <div class="tab-header">
+                <button class="tab-btn active" onclick="switchTab('login')">Iniciar Sesión</button>
+                <button class="tab-btn" onclick="switchTab('register')">Crear Cuenta</button>
+            </div>
+
+            <!-- Tab Iniciar Sesión -->
+            <div id="tab-login" class="tab-content active">
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="email">Correo Corporativo:</label>
+                        <input type="email" id="email" required placeholder="analista@secdataguard.cl" value="analista@secdataguard.cl">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Contraseña Cifrada:</label>
+                        <input type="password" id="password" required placeholder="••••••••" value="admin123">
+                    </div>
+                    <button type="submit" class="btn-primary">Acceder al Panel SOC</button>
+                </form>
+            </div>
+
+            <!-- Tab Crear Cuenta -->
+            <div id="tab-register" class="tab-content">
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="reg-nombre">Nombre Completo:</label>
+                        <input type="text" id="reg-nombre" required placeholder="Ej. Carlos Mendoza">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-email">Correo Electrónico:</label>
+                        <input type="email" id="reg-email" required placeholder="carlos@secdataguard.cl">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-password">Contraseña:</label>
+                        <input type="password" id="reg-password" required placeholder="••••••••">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-rol">Rol asignado:</label>
+                        <select id="reg-rol">
+                            <option value="Analista SOC Level 1">Analista SOC Level 1</option>
+                            <option value="Ingeniero de Ciberseguridad">Ingeniero de Ciberseguridad</option>
+                            <option value="Auditor de Seguridad">Auditor de Seguridad</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary" style="background-color: var(--accent-cyan); color: #000;">Registrar Nueva Cuenta</button>
+                </form>
+            </div>
         </section>
 
-        <!-- Formulario 2: Ingesta de Incidentes de Seguridad -->
+        <!-- Formulario 2: Ingesta de Incidentes -->
         <section class="card">
             <h2>Registrar Nuevo Incidente</h2>
             <form id="incident-form">
@@ -44,19 +100,30 @@
                 <div class="form-group">
                     <label for="categoria">Categoría de Amenaza:</label>
                     <select id="categoria" required>
-                        <option value="1">Fuerza Bruta</option>
-                        <option value="2">Inyección SQL</option>
+                        <option value="Fuerza Bruta">Fuerza Bruta</option>
+                        <option value="Inyección SQL">Inyección SQL</option>
+                        <option value="Malware / Ransomware">Malware / Ransomware</option>
+                        <option value="Phishing">Phishing</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="severidad">Nivel de Severidad:</label>
+                    <select id="severidad" required>
+                        <option value="Crítica">Crítica</option>
+                        <option value="Alta" selected>Alta</option>
+                        <option value="Media">Media</option>
+                        <option value="Baja">Baja</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="descripcion">Detalle Técnico:</label>
-                    <textarea id="descripcion" rows="3" required placeholder="Describa el vector de ataque..."></textarea>
+                    <textarea id="descripcion" rows="2" required placeholder="Describa el vector de ataque..."></textarea>
                 </div>
                 <button type="submit" class="btn-primary">Guardar e Informar Sincrónicamente</button>
             </form>
         </section>
 
-        <!-- Formulario 3: Recuperación de Credenciales -->
+        <!-- Formulario 3: Recuperación -->
         <section class="card">
             <h2>Recuperación de Credenciales</h2>
             <form id="recover-form">
@@ -64,24 +131,55 @@
                     <label for="recover-email">Correo de Recuperación:</label>
                     <input type="email" id="recover-email" required placeholder="usuario@empresa.cl">
                 </div>
-                <button type="submit" class="btn-secondary">Enviar Enlace Seguro (SMTP)</button>
+                <button type="submit" class="btn-secondary" style="width: 100%;">Enviar Token SMTP</button>
             </form>
         </section>
 
         <!-- Panel de Monitoreo Dinámico -->
         <section class="card full-width">
-            <h2>Eventos e Incidentes Registrados (Tiempo Real)</h2>
-            <div id="status-alert" class="alert hidden">Nuevas amenazas registradas sincrónicamente</div>
+            <h2>Eventos e Incidentes Registrados (Tiempo Real - WebSockets)</h2>
             <ul id="incident-list" class="data-list">
-                <li>Cargando incidentes desde SQL Server...</li>
+                <li>Cargando incidentes desde el servidor SOC...</li>
             </ul>
         </section>
     </main>
 
+    <!-- Contenedor de Alertas Toast -->
+    <div id="toast-container"></div>
+
     <script>
         const socket = io();
 
-        // 1. Cargar incidentes iniciales desde la API REST
+        // Alternar Pestañas (Tabs)
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            if (tabName === 'login') {
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+                document.getElementById('tab-login').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                document.getElementById('tab-register').classList.add('active');
+            }
+        }
+
+        // Sistema de Notificaciones Toast
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            if (type === 'error') toast.style.borderColor = 'var(--danger)';
+            if (type === 'success') toast.style.borderColor = 'var(--success)';
+            toast.innerHTML = `<strong>SecDataGuard:</strong> ${message}`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 4000);
+        }
+
+        // Cargar incidentes iniciales desde la API REST
         async function loadIncidents() {
             try {
                 const res = await fetch('/api/v1/incidentes');
@@ -89,8 +187,7 @@
                 renderList(data);
             } catch (err) {
                 console.error('Error al conectar con la API:', err);
-                const list = document.getElementById('incident-list');
-                if (list) list.innerHTML = '<li>Error al conectar con la API REST.</li>';
+                document.getElementById('incident-list').innerHTML = '<li>Error al conectar con la API REST.</li>';
             }
         }
 
@@ -98,6 +195,9 @@
             const list = document.getElementById('incident-list');
             if (!list) return;
             list.innerHTML = '';
+
+            const activeCount = document.getElementById('active-incidents-count');
+            if (activeCount) activeCount.textContent = incidentes.length;
             
             if (!incidentes || incidentes.length === 0) {
                 list.innerHTML = '<li>No hay incidentes registrados.</li>';
@@ -106,66 +206,171 @@
 
             incidentes.forEach(inc => {
                 const li = document.createElement('li');
-                li.style.marginBottom = "8px";
-                li.innerHTML = `<strong>[ID ${inc.id_incidente}] ${inc.titulo}</strong> - ${inc.descripcion} <em>(${new Date(inc.fecha_registro).toLocaleTimeString()})</em>`;
+                const isCritical = inc.severidad === 'Crítica';
+                li.className = `incident-item ${isCritical ? 'critical' : 'high'}`;
+                
+                li.innerHTML = `
+                    <div>
+                        <strong>[ID #${inc.id_incidente}] ${inc.titulo}</strong>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                            ${inc.descripcion} | <em>Cat: ${inc.categoria || 'General'}</em>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span class="badge ${isCritical ? 'badge-critical' : 'badge-high'}">${inc.severidad || 'Alta'}</span>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                            ${new Date(inc.fecha_registro).toLocaleTimeString()}
+                        </div>
+                    </div>
+                `;
                 list.appendChild(li);
             });
         }
 
-        // 2. Escuchar recepción en tiempo real vía WebSockets
+        // Escuchar recepción en tiempo real vía WebSockets
         socket.on('nuevo_incidente', (incidente) => {
             const list = document.getElementById('incident-list');
             if (list) {
-                // Remover mensaje vacío si existe
-                if (list.children.length === 1 && list.children[0].textContent.includes('No hay incidentes')) {
-                    list.innerHTML = '';
-                }
-
                 const li = document.createElement('li');
-                li.style.marginBottom = "8px";
-                li.style.color = "#0056b3"; // Resaltar el nuevo recibido en azul
-                li.style.fontWeight = "500";
-                li.innerHTML = `<strong>[ID ${incidente.id_incidente}] ${incidente.titulo}</strong> - ${incidente.descripcion} <em>(${new Date(incidente.fecha_registro).toLocaleTimeString()})</em>`;
+                const isCritical = incidente.severidad === 'Crítica';
+                li.className = `incident-item ${isCritical ? 'critical' : 'high'}`;
+                
+                li.innerHTML = `
+                    <div>
+                        <strong>[ID #${incidente.id_incidente}] ${incidente.titulo}</strong>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                            ${incidente.descripcion} | <em>Cat: ${incidente.categoria || 'General'}</em>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span class="badge ${isCritical ? 'badge-critical' : 'badge-high'}">${incidente.severidad || 'Alta'}</span>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                            ${new Date(incidente.fecha_registro).toLocaleTimeString()}
+                        </div>
+                    </div>
+                `;
                 
                 list.insertBefore(li, list.firstChild);
+                showToast(`🚨 ¡NUEVA AMENAZA REPORTADA!: ${incidente.titulo}`, 'error');
+
+                const activeCount = document.getElementById('active-incidents-count');
+                if (activeCount) activeCount.textContent = parseInt(activeCount.textContent) + 1;
             }
         });
 
-        // 3. Capturar el submit del formulario e interactuar con la API REST
+        // Control de Formularios y Eventos DOM
         document.addEventListener('DOMContentLoaded', () => {
             loadIncidents();
 
+            // Formulario de Ingesta de Incidentes
             const incidentForm = document.getElementById('incident-form');
             if (incidentForm) {
                 incidentForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     
-                    const tituloInput = document.getElementById('titulo');
-                    const descripcionInput = document.getElementById('descripcion');
-
-                    const titulo = tituloInput.value.trim();
-                    const descripcion = descripcionInput.value.trim();
-
-                    if (!titulo || !descripcion) return;
+                    const titulo = document.getElementById('titulo').value.trim();
+                    const categoria = document.getElementById('categoria').value;
+                    const severidad = document.getElementById('severidad').value;
+                    const descripcion = document.getElementById('descripcion').value.trim();
 
                     try {
                         const response = await fetch('/api/v1/incidentes', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ titulo, descripcion })
+                            body: JSON.stringify({ titulo, categoria, severidad, descripcion })
                         });
 
                         if (response.ok) {
-                            // Limpiar los inputs tras registrar con éxito
-                            tituloInput.value = '';
-                            descripcionInput.value = '';
+                            document.getElementById('titulo').value = '';
+                            document.getElementById('descripcion').value = '';
+                            showToast('Incidente transmitido sincrónicamente al centro de comando.', 'success');
                         }
                     } catch (err) {
-                        console.error('Error al enviar el incidente:', err);
+                        showToast('Error de transmisión con el servidor.', 'error');
                     }
                 });
             }
+
+            // Formulario de Inicio de Sesión
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) {
+                loginForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    
+                    const email = document.getElementById('email').value.trim();
+                    const password = document.getElementById('password').value.trim();
+
+                    try {
+                        const res = await fetch('/api/v1/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email, password })
+                        });
+
+                        const data = await res.json();
+
+                        if (res.ok) {
+                            showToast(`Sesión iniciada: Bienvenido ${data.usuario.nombre}`, 'success');
+                            document.getElementById('user-role').textContent = `Perfil: ${data.usuario.rol}`;
+                        } else {
+                            showToast(data.message, 'error');
+                        }
+                    } catch (err) {
+                        showToast('Error al conectar con la API de autenticación.', 'error');
+                    }
+                });
+            }
+
+            // Formulario de Crear Cuenta (Registro)
+            const registerForm = document.getElementById('register-form');
+            if (registerForm) {
+                registerForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+
+                    const nombre = document.getElementById('reg-nombre').value.trim();
+                    const email = document.getElementById('reg-email').value.trim();
+                    const password = document.getElementById('reg-password').value.trim();
+                    const rol = document.getElementById('reg-rol').value;
+
+                    try {
+                        const res = await fetch('/api/v1/register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ nombre, email, password, rol })
+                        });
+
+                        const data = await res.json();
+
+                        if (res.ok) {
+                            showToast(`Cuenta creada exitosamente para ${data.usuario.nombre}`, 'success');
+                            document.getElementById('user-role').textContent = `Perfil: ${data.usuario.rol}`;
+                            switchTab('login');
+                            document.getElementById('email').value = email;
+                        } else {
+                            showToast(data.message, 'error');
+                        }
+                    } catch (err) {
+                        showToast('Error al registrar usuario.', 'error');
+                    }
+                });
+            }
+
+            // Formulario de Recuperación
+            const recoverForm = document.getElementById('recover-form');
+            if (recoverForm) {
+                recoverForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('recover-email').value.trim();
+                    showToast(`Token de restablecimiento SMTP enviado a ${email}`, 'success');
+                    document.getElementById('recover-email').value = '';
+                });
+            }
         });
+
+        function cerrarSesion() {
+            document.getElementById('user-role').textContent = 'Perfil: Visitante (No Autenticado)';
+            showToast('Sesión finalizada en el SOC.', 'info');
+        }
     </script>
 </body>
 </html>

@@ -15,13 +15,29 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let isDbConnected = false;
 
-// Array en memoria para guardar e informar incidentes en la nube
+// Base de datos en memoria (Cloud Fallback) con datos corporativos de prueba
+const usuariosMock = [
+    { email: 'analista@secdataguard.cl', password: 'admin123', nombre: 'Analista Principal', rol: 'SOC Level 2' }
+];
+
 const mockIncidentes = [
     {
-        id_incidente: 1,
-        titulo: "Infección de Ransomware (Modo Cloud)",
-        descripcion: "Detección de ejecutable malicioso en servidor principal.",
+        id_incidente: 101,
+        titulo: "Infección de Ransomware Bloqueada",
+        categoria: "Malware",
+        severidad: "Crítica",
+        estado: "Mitigado",
+        descripcion: "Ejecutable malicioso neutralizado en el Servidor de Archivos Principal por el agente EDR.",
         fecha_registro: new Date().toISOString()
+    },
+    {
+        id_incidente: 102,
+        titulo: "Intento de Inyección SQL (WAF Alert)",
+        categoria: "Inyección SQL",
+        severidad: "Alta",
+        estado: "En Análisis",
+        descripcion: "Peticiones maliciosas detectadas en endpoint /api/v1/auth. IP de origen bloqueada.",
+        fecha_registro: new Date(Date.now() - 3600000).toISOString()
     }
 ];
 
@@ -41,22 +57,23 @@ const dbConfig = {
 sql.connect(dbConfig)
     .then(() => {
         isDbConnected = true;
-        console.log('Conectado a SQL Server exitosamente.');
+        console.log('Conectado a SQL Server local exitosamente.');
     })
     .catch(err => {
         isDbConnected = false;
-        console.log('Servidor iniciado en modo Cloud Fallback.');
+        console.log('Servidor iniciado en modo Cloud Fallback para Render.');
     });
 
+// Ruta Principal
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// GET: Obtener incidentes
+// API REST: Obtener Incidentes
 app.get('/api/v1/incidentes', async (req, res) => {
     if (isDbConnected) {
         try {
-            const result = await sql.query('SELECT * FROM INCIDENTES');
+            const result = await sql.query('SELECT * FROM INCIDENTES ORDER BY id_incidente DESC');
             return res.json(result.recordset);
         } catch (err) {
             return res.status(500).json({ error: err.message });
@@ -66,14 +83,17 @@ app.get('/api/v1/incidentes', async (req, res) => {
     }
 });
 
-// POST: Registrar nuevo incidente desde el formulario
+// API REST: Registrar Nuevo Incidente
 app.post('/api/v1/incidentes', async (req, res) => {
-    const { titulo, descripcion } = req.body;
+    const { titulo, categoria, severidad, descripcion } = req.body;
     
     const nuevoIncidente = {
-        id_incidente: mockIncidentes.length + 1,
-        titulo: titulo || "Amenaza Registrada",
-        descripcion: descripcion || "Sin detalle técnico proporcionado",
+        id_incidente: Math.floor(100 + Math.random() * 900),
+        titulo: titulo || "Amenaza Incalculada",
+        categoria: categoria || "General",
+        severidad: severidad || "Alta",
+        estado: "En Análisis",
+        descripcion: descripcion || "Sin detalle adjunto.",
         fecha_registro: new Date().toISOString()
     };
 
@@ -81,23 +101,64 @@ app.post('/api/v1/incidentes', async (req, res) => {
         try {
             await sql.query(`INSERT INTO INCIDENTES (titulo, descripcion) VALUES ('${nuevoIncidente.titulo}', '${nuevoIncidente.descripcion}')`);
         } catch (err) {
-            console.error("Error guardando en BD:", err);
+            console.error("Error insertando en SQL Server:", err);
         }
     } else {
         mockIncidentes.unshift(nuevoIncidente);
     }
 
-    // EMISIÓN EN TIEMPO REAL VÍA WEBSOCKETS A TODOS LOS NAVEGADORES CONECTADOS
+    // Notificar por WebSockets a todos los clientes en tiempo real
     io.emit('nuevo_incidente', nuevoIncidente);
 
     return res.status(201).json({ status: 'ok', data: nuevoIncidente });
 });
 
+// API REST: Autenticación (Login)
+app.post('/api/v1/login', (req, res) => {
+    const { email, password } = req.body;
+    const user = usuariosMock.find(u => u.email === email && u.password === password);
+
+    if (user) {
+        return res.json({
+            status: 'ok',
+            message: 'Autenticación exitosa',
+            usuario: { nombre: user.nombre, email: user.email, rol: user.rol }
+        });
+    } else {
+        return res.status(401).json({ status: 'error', message: 'Credenciales inválidas o cuenta inexistente.' });
+    }
+});
+
+// API REST: Crear Cuenta (Registro)
+app.post('/api/v1/register', (req, res) => {
+    const { nombre, email, password, rol } = req.body;
+
+    const existe = usuariosMock.some(u => u.email === email);
+    if (existe) {
+        return res.status(400).json({ status: 'error', message: 'El correo electrónico ya se encuentra registrado.' });
+    }
+
+    const nuevoUsuario = {
+        nombre: nombre || 'Analista Nuevo',
+        email,
+        password,
+        rol: rol || 'Analista SOC Level 1'
+    };
+
+    usuariosMock.push(nuevoUsuario);
+
+    return res.status(201).json({
+        status: 'ok',
+        message: 'Cuenta creada con éxito',
+        usuario: { nombre: nuevoUsuario.nombre, email: nuevoUsuario.email, rol: nuevoUsuario.rol }
+    });
+});
+
 io.on('connection', (socket) => {
-    console.log('Cliente conectado vía WebSockets:', socket.id);
+    console.log('Cliente SOC conectado vía WebSockets:', socket.id);
 });
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-    console.log(`Servidor corriendo en puerto ${PORT}`);
+    console.log(`SecDataGuard backend ejecutándose en puerto ${PORT}`);
 });
