@@ -16,12 +16,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 let isDbConnected = false;
 
 // --------------------------------------------------------------------------
-// 1. USUARIOS Y PERFILES DIFERENCIADOS (RBAC)
+// 1. USUARIOS Y PERFILES DIFERENCIADOS (RBAC) - CRUD USUARIOS
 // --------------------------------------------------------------------------
-const usuariosMock = [
-    { usuario_id: 1, email: 'admin@secdataguard.cl', password: 'admin123', nombre: 'Administrador SOC', rol: 'Administrador' },
-    { usuario_id: 2, email: 'analista@secdataguard.cl', password: 'admin123', nombre: 'Analista Operador', rol: 'Analista' },
-    { usuario_id: 3, email: 'jtapia@secdataguard.cl', password: 'admin123', nombre: 'Johann Tapia', rol: 'Administrador' }
+let usuariosMock = [
+    { usuario_id: 1, email: 'admin@secdataguard.cl', password: 'admin123', nombre: 'Administrador SOC', rol: 'Administrador', estado: 'Activo' },
+    { usuario_id: 2, email: 'analista@secdataguard.cl', password: 'admin123', nombre: 'Analista Operador', rol: 'Analista', estado: 'Activo' },
+    { usuario_id: 3, email: 'jtapia@secdataguard.cl', password: 'admin123', nombre: 'Johann Tapia', rol: 'Administrador', estado: 'Activo' }
 ];
 
 // --------------------------------------------------------------------------
@@ -75,6 +75,7 @@ let mockFuentes = [
 app.set('mockIncidentes', mockIncidentes);
 app.set('mockCategorias', mockCategorias);
 app.set('mockFuentes', mockFuentes);
+app.set('usuariosMock', usuariosMock);
 app.set('io', io);
 app.set('sql', sql);
 app.set('getIsDbConnected', () => isDbConnected);
@@ -122,17 +123,85 @@ app.use('/api/v1/categorias', categoriasRoutes);
 app.use('/api/v1/fuentes', fuentesRoutes);
 
 // --------------------------------------------------------------------------
-// 5. AUTENTICACIÓN (RBAC) Y COMPATIBILIDAD HEREDADA
+// 5. RUTAS CRUD DE GESTIÓN DE USUARIOS
+// --------------------------------------------------------------------------
+
+// Obteners usuarios (READ)
+app.get('/api/v1/usuarios', (req, res) => {
+    res.json(usuariosMock.map(u => ({
+        usuario_id: u.usuario_id,
+        nombre: u.nombre,
+        email: u.email,
+        rol: u.rol,
+        estado: u.estado || 'Activo'
+    })));
+});
+
+// Registrar nuevo usuario (CREATE)
+app.post('/api/v1/register', (req, res) => {
+    const { nombre, email, password, rol } = req.body;
+    
+    if (!email || !password || !nombre) {
+        return res.status(400).json({ status: 'error', message: 'Faltan datos obligatorios.' });
+    }
+
+    const existe = usuariosMock.find(u => u.email === email);
+    if (existe) {
+        return res.status(400).json({ status: 'error', message: 'El correo ya se encuentra registrado.' });
+    }
+
+    const nuevoUsuario = {
+        usuario_id: Date.now(),
+        nombre,
+        email,
+        password,
+        rol: rol || 'Analista',
+        estado: 'Activo'
+    };
+
+    usuariosMock.push(nuevoUsuario);
+    res.status(201).json({
+        status: 'ok',
+        message: 'Usuario creado exitosamente',
+        usuario: { usuario_id: nuevoUsuario.usuario_id, nombre, email, rol: nuevoUsuario.rol }
+    });
+});
+
+// Cambiar estado / Bloquear usuario (UPDATE)
+app.patch('/api/v1/usuarios/:id/estado', (req, res) => {
+    const { id } = req.params;
+    const { estado } = req.body;
+    
+    const usuario = usuariosMock.find(u => u.usuario_id == id);
+    if (usuario) {
+        usuario.estado = estado;
+        return res.json({ status: 'ok', message: `Estado actualizado a ${estado}`, usuario });
+    }
+    res.status(404).json({ status: 'error', message: 'Usuario no encontrado.' });
+});
+
+// Eliminar usuario (DELETE)
+app.delete('/api/v1/usuarios/:id', (req, res) => {
+    const { id } = req.params;
+    usuariosMock = usuariosMock.filter(u => u.usuario_id != id);
+    res.json({ status: 'ok', message: 'Usuario eliminado del sistema.' });
+});
+
+// --------------------------------------------------------------------------
+// 6. AUTENTICACIÓN (RBAC) Y COMPATIBILIDAD HEREDADA
 // --------------------------------------------------------------------------
 app.post('/api/v1/login', (req, res) => {
     const { email, password } = req.body;
     const user = usuariosMock.find(u => u.email === email && u.password === password);
 
     if (user) {
+        if (user.estado === 'Bloqueado') {
+            return res.status(403).json({ status: 'error', message: 'Esta cuenta se encuentra suspendida o bloqueada.' });
+        }
         return res.json({
             status: 'ok',
             message: 'Autenticación exitosa',
-            usuario: { usuario_id: user.usuario_id, nombre: user.nombre, email: user.email, rol: user.rol }
+            usuario: { usuario_id: user.usuario_id, nombre: user.nombre, email: user.email, rol: user.rol, estado: user.estado }
         });
     } else {
         return res.status(401).json({ status: 'error', message: 'Credenciales inválidas o cuenta inexistente.' });
