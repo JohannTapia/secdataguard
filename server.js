@@ -15,19 +15,28 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let isDbConnected = false;
 
-// Usuarios precargados para Render
+// --------------------------------------------------------------------------
+// 1. USUARIOS Y PERFILES DIFERENCIADOS (RBAC)
+// --------------------------------------------------------------------------
 const usuariosMock = [
-    { email: 'analista@secdataguard.cl', password: 'admin123', nombre: 'Analista Principal', rol: 'SOC Level 2' },
-    { email: 'admin@secdataguard.cl', password: 'admin123', nombre: 'Administrador SOC', rol: 'SOC Level 2' },
-    { email: 'jtapia@secdataguard.cl', password: 'admin123', nombre: 'Johann Tapia', rol: 'SOC Level 2' }
+    { usuario_id: 1, email: 'admin@secdataguard.cl', password: 'admin123', nombre: 'Administrador SOC', rol: 'Administrador' },
+    { usuario_id: 2, email: 'analista@secdataguard.cl', password: 'admin123', nombre: 'Analista Operador', rol: 'Analista' },
+    { usuario_id: 3, email: 'jtapia@secdataguard.cl', password: 'admin123', nombre: 'Johann Tapia', rol: 'Administrador' }
 ];
 
-// Base de datos en memoria para Render (Cloud Operations)
+// --------------------------------------------------------------------------
+// 2. BASES DE DATOS EN MEMORIA (FALLBACK MOCK PARA RENDER / CLOUD ENGINE)
+// --------------------------------------------------------------------------
+
+// CRUD 1: INCIDENTES
 let mockIncidentes = [
     {
         incidente_id: 993,
         titulo: "Intento de Inyección SQL Detectado",
+        categoria_id: 1,
         categoria: "Inyección SQL",
+        fuente_id: 1,
+        fuente: "WAF Perimetral",
         severidad: "Alta",
         estado: "ACTIVO",
         descripcion: "Peticiones maliciosas detectadas en endpoint /api/v1/auth. IP de origen bloqueada.",
@@ -36,7 +45,10 @@ let mockIncidentes = [
     {
         incidente_id: 101,
         titulo: "Infección de Ransomware Bloqueada",
-        categoria: "Malware",
+        categoria_id: 2,
+        categoria: "Malware/Ransomware",
+        fuente_id: 2,
+        fuente: "EDR Endpoint",
         severidad: "Crítica",
         estado: "MITIGADO",
         descripcion: "Ejecutable malicioso neutralizado en el Servidor de Archivos Principal por el agente EDR.",
@@ -44,6 +56,32 @@ let mockIncidentes = [
     }
 ];
 
+// CRUD 2: CATEGORÍAS DE AMENAZAS
+let mockCategorias = [
+    { categoria_id: 1, nombre_categoria: "Inyección SQL", nivel_criticidad: "Alta" },
+    { categoria_id: 2, nombre_categoria: "Malware/Ransomware", nivel_criticidad: "Crítica" },
+    { categoria_id: 3, nombre_categoria: "Ataque DDoS", nivel_criticidad: "Alta" },
+    { categoria_id: 4, nombre_categoria: "Acceso No Autorizado", nivel_criticidad: "Media" }
+];
+
+// CRUD 3: FUENTES DE DETECCIÓN (SENSORES)
+let mockFuentes = [
+    { fuente_id: 1, nombre_fuente: "WAF Perimetral", direccion_ip: "192.168.1.254" },
+    { fuente_id: 2, nombre_fuente: "EDR Endpoint", direccion_ip: "10.0.0.15" },
+    { fuente_id: 3, nombre_fuente: "Firewall L7", direccion_ip: "192.168.1.1" }
+];
+
+// Compartir recursos globales con los módulos de la carpeta routes/
+app.set('mockIncidentes', mockIncidentes);
+app.set('mockCategorias', mockCategorias);
+app.set('mockFuentes', mockFuentes);
+app.set('io', io);
+app.set('sql', sql);
+app.set('getIsDbConnected', () => isDbConnected);
+
+// --------------------------------------------------------------------------
+// 3. CONFIGURACIÓN E INTENTO DE CONEXIÓN A SQL SERVER
+// --------------------------------------------------------------------------
 const dbConfig = {
     user: process.env.DB_USER || 'node_app',
     password: process.env.DB_PASSWORD || 'SecData2026*',
@@ -57,81 +95,35 @@ const dbConfig = {
     }
 };
 
-// Intentar conexión a SQL Server (Si no se puede, usa Cloud Engine sin colapsar)
 sql.connect(dbConfig)
     .then(() => {
         isDbConnected = true;
         console.log('Conectado a SQL Server local exitosamente.');
     })
-    .catch(err => {
+    .catch(() => {
         isDbConnected = false;
-        console.log('Servidor iniciado en modo Cloud Native para Render.');
+        console.log('Servidor iniciado en modo Cloud Native (Mock Engine Active) para Render.');
     });
 
-// Ruta Principal
+// Ruta Principal Frontend
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// API REST: Obtener Incidentes
-app.get('/api/v1/incidentes', async (req, res) => {
-    if (isDbConnected) {
-        try {
-            const result = await sql.query('SELECT * FROM INCIDENTES ORDER BY incidente_id DESC');
-            return res.json(result.recordset);
-        } catch (err) {
-            return res.json(mockIncidentes);
-        }
-    } else {
-        return res.json(mockIncidentes);
-    }
-});
+// --------------------------------------------------------------------------
+// 4. RUTAS MODULARES DE LA CARPETA routes/ (CRUDs)
+// --------------------------------------------------------------------------
+const incidentesRoutes = require('./routes/incidentes');
+const categoriasRoutes = require('./routes/categorias');
+const fuentesRoutes = require('./routes/fuentes');
 
-// API REST: Registrar Nuevo Incidente
-app.post('/api/v1/incidentes', async (req, res) => {
-    const { titulo, categoria, severidad, descripcion } = req.body;
-    
-    // Generar ID correlativo
-    const nextId = mockIncidentes.length > 0 ? Math.max(...mockIncidentes.map(i => i.incidente_id)) + 1 : 100;
+app.use('/api/v1/incidentes', incidentesRoutes);
+app.use('/api/v1/categorias', categoriasRoutes);
+app.use('/api/v1/fuentes', fuentesRoutes);
 
-    const nuevoIncidente = {
-        incidente_id: nextId,
-        titulo: titulo || "Amenaza Detectada en Red",
-        categoria: categoria || "Inyección SQL",
-        severidad: severidad || "Alta",
-        estado: "ACTIVO",
-        descripcion: descripcion || "Vector de ataque aislado por reglas del WAF.",
-        fecha_registro: new Date().toISOString()
-    };
-
-    if (isDbConnected) {
-        try {
-            await sql.query(`
-                INSERT INTO INCIDENTES (fecha_registro, categoria_id, fuente_id, usuario_reporta_id, estado, descripcion) 
-                VALUES (GETDATE(), 1, 1, 1, 'ACTIVO', '${nuevoIncidente.titulo}: ${nuevoIncidente.descripcion}')
-            `);
-        } catch (err) {
-            console.error("Modo Cloud: Persistiendo en memoria activa.");
-        }
-    }
-
-    // Guardar siempre en memoria activa para Render
-    mockIncidentes.unshift(nuevoIncidente);
-
-    // Transmisión inmediata vía WebSockets a la web
-    io.emit('nuevo_incidente', nuevoIncidente);
-
-    return res.status(201).json({ status: 'ok', data: nuevoIncidente });
-});
-
-// Endpoints compatibles
-app.get('/api/incidentes', (req, res) => res.json(mockIncidentes));
-app.post('/api/incidentes', async (req, res) => {
-    req.url = '/api/v1/incidentes';
-    return app._router.handle(req, res);
-});
-
-// API REST: Autenticación (Login)
+// --------------------------------------------------------------------------
+// 5. AUTENTICACIÓN (RBAC) Y COMPATIBILIDAD HEREDADA
+// --------------------------------------------------------------------------
 app.post('/api/v1/login', (req, res) => {
     const { email, password } = req.body;
     const user = usuariosMock.find(u => u.email === email && u.password === password);
@@ -140,14 +132,21 @@ app.post('/api/v1/login', (req, res) => {
         return res.json({
             status: 'ok',
             message: 'Autenticación exitosa',
-            usuario: { nombre: user.nombre, email: user.email, rol: user.rol }
+            usuario: { usuario_id: user.usuario_id, nombre: user.nombre, email: user.email, rol: user.rol }
         });
     } else {
         return res.status(401).json({ status: 'error', message: 'Credenciales inválidas o cuenta inexistente.' });
     }
 });
 
-// Sockets
+// Endpoints heredados
+app.get('/api/incidentes', (req, res) => res.json(app.get('mockIncidentes')));
+app.post('/api/incidentes', (req, res) => {
+    req.url = '/api/v1/incidentes';
+    return app._router.handle(req, res);
+});
+
+// WebSockets
 io.on('connection', (socket) => {
     console.log('Cliente SOC conectado vía WebSockets:', socket.id);
 });
