@@ -149,6 +149,7 @@
 
     <script>
         const socket = io();
+        let rolUsuarioActual = 'Visitante';
 
         // Alternar Pestañas (Tabs)
         function switchTab(tabName) {
@@ -208,10 +209,12 @@
             }
 
             incidentes.forEach(inc => {
-                // FIX: Evalúa la propiedad exacta que devuelva PostgreSQL o MariaDB
                 const idMostrada = inc.incidente_id || inc.id_incidente || inc.id || 'N/A';
                 const isCritical = inc.severidad === 'Crítica';
                 const fecha = inc.fecha_registro ? new Date(inc.fecha_registro).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+                // Mostrar u ocultar botón de borrar según rol (RBAC)
+                const mostrarBotonEliminar = (rolUsuarioActual === 'Administrador');
 
                 const li = document.createElement('li');
                 li.className = `incident-item ${isCritical ? 'critical' : 'high'}`;
@@ -223,54 +226,44 @@
                             ${inc.descripcion} | <em>Cat: ${inc.categoria || 'General'}</em>
                         </div>
                     </div>
-                    <div style="text-align: right;">
+                    <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
                         <span class="badge ${isCritical ? 'badge-critical' : 'badge-high'}">${inc.severidad || 'Alta'}</span>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">
                             ${fecha}
                         </div>
+                        ${mostrarBotonEliminar ? `<button onclick="eliminarIncidente('${idMostrada}')" style="background: #e63946; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-top: 4px;">🗑️ Eliminar</button>` : ''}
                     </div>
                 `;
                 list.appendChild(li);
             });
         }
 
-        // Escuchar recepción en tiempo real vía WebSockets
-        socket.on('nuevo_incidente', (incidente) => {
-            const list = document.getElementById('incident-list');
-            if (list) {
-                const idMostrada = incidente.incidente_id || incidente.id_incidente || incidente.id || 'N/A';
-                const isCritical = incidente.severidad === 'Crítica';
-                const fecha = incidente.fecha_registro ? new Date(incidente.fecha_registro).toLocaleTimeString() : new Date().toLocaleTimeString();
-
-                const li = document.createElement('li');
-                li.className = `incident-item ${isCritical ? 'critical' : 'high'}`;
-                
-                li.innerHTML = `
-                    <div>
-                        <strong>[ID #${idMostrada}] ${incidente.titulo}</strong>
-                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
-                            ${incidente.descripcion} | <em>Cat: ${incidente.categoria || 'General'}</em>
-                        </div>
-                    </div>
-                    <div style="text-align: right;">
-                        <span class="badge ${isCritical ? 'badge-critical' : 'badge-high'}">${incidente.severidad || 'Alta'}</span>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
-                            ${fecha}
-                        </div>
-                    </div>
-                `;
-                
-                if (list.querySelector('li') && list.querySelector('li').innerText.includes('No hay incidentes')) {
-                    list.innerHTML = '';
-                }
-
-                list.insertBefore(li, list.firstChild);
-                showToast(`🚨 ¡NUEVA AMENAZA REPORTADA!: ${incidente.titulo}`, 'error');
-
-                const activeCount = document.getElementById('active-incidents-count');
-                if (activeCount) activeCount.textContent = parseInt(activeCount.textContent || 0) + 1;
+        // Función para eliminar incidente (Solo Admin)
+        async function eliminarIncidente(id) {
+            if (rolUsuarioActual !== 'Administrador') {
+                showToast('Acceso denegado: Se requieren permisos de Administrador.', 'error');
+                return;
             }
-        });
+
+            if (!confirm(`¿Desea eliminar el incidente #${id}?`)) return;
+
+            try {
+                const res = await fetch(`/api/v1/incidentes/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    showToast(`Incidente #${id} eliminado con éxito.`, 'success');
+                    loadIncidents();
+                } else {
+                    showToast('Error al eliminar el incidente.', 'error');
+                }
+            } catch (err) {
+                showToast('Error de conexión con el servidor.', 'error');
+            }
+        }
+
+        // Escuchar recepción en tiempo real vía WebSockets
+        socket.on('nuevo_incidente', () => loadIncidents());
+        socket.on('incidente_actualizado', () => loadIncidents());
+        socket.on('incidente_eliminado', () => loadIncidents());
 
         // Control de Formularios y Eventos DOM
         document.addEventListener('DOMContentLoaded', () => {
@@ -305,7 +298,7 @@
                 });
             }
 
-            // Formulario de Inicio de Sesión
+            // Formulario de Inicio de Sesión (RBAC)
             const loginForm = document.getElementById('login-form');
             if (loginForm) {
                 loginForm.addEventListener('submit', async (e) => {
@@ -325,9 +318,13 @@
 
                         if (res.ok) {
                             const userNombre = data.usuario ? data.usuario.nombre : 'Usuario';
-                            const userRol = data.usuario ? data.usuario.rol : 'Autenticado';
+                            rolUsuarioActual = data.usuario ? data.usuario.rol : 'Analista';
+
                             showToast(`Sesión iniciada: Bienvenido ${userNombre}`, 'success');
-                            document.getElementById('user-role').textContent = `Perfil: ${userNombre} (${userRol})`;
+                            document.getElementById('user-role').textContent = `Perfil: ${userNombre} (${rolUsuarioActual})`;
+                            
+                            // Re-renderizar la lista para aplicar restricciones de interfaz (RBAC)
+                            loadIncidents();
                         } else {
                             showToast(data.message || 'Error de credenciales', 'error');
                         }
@@ -359,11 +356,14 @@
 
                         if (res.ok) {
                             const nombreRegistrado = data.usuario ? data.usuario.nombre : nombre;
-                            const rolRegistrado = data.usuario ? data.usuario.rol : rol;
+                            rolUsuarioActual = data.usuario ? data.usuario.rol : 'Analista';
+
                             showToast(`Cuenta creada exitosamente para ${nombreRegistrado}`, 'success');
-                            document.getElementById('user-role').textContent = `Perfil: ${nombreRegistrado} (${rolRegistrado})`;
+                            document.getElementById('user-role').textContent = `Perfil: ${nombreRegistrado} (${rolUsuarioActual})`;
                             switchTab('login');
                             document.getElementById('email').value = email;
+
+                            loadIncidents();
                         } else {
                             showToast(data.message || 'Error al registrar', 'error');
                         }
@@ -386,8 +386,10 @@
         });
 
         function cerrarSesion() {
+            rolUsuarioActual = 'Visitante';
             document.getElementById('user-role').textContent = 'Perfil: Visitante (No Autenticado)';
             showToast('Sesión finalizada en el SOC.', 'info');
+            loadIncidents();
         }
     </script>
 </body>
