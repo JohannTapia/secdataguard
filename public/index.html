@@ -6,11 +6,31 @@
     <title>SecDataGuard - SOC Operations Platform</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        .admin-only { display: none; }
+        .badge-mode {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .admin-badge { background: #e63946; color: #fff; }
+        .analyst-badge { background: #f1c40f; color: #000; }
+        .admin-panel-card {
+            background: linear-gradient(135deg, rgba(230, 57, 70, 0.15), rgba(20, 20, 30, 0.8));
+            border: 1px solid #e63946;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+        }
+    </style>
 </head>
 <body>
     <header class="navbar">
         <div class="logo">
             🛡️ SecData<span>Guard</span>
+            <span id="mode-badge" class="badge-mode analyst-badge">Modo: Visitante (Sin Autenticar)</span>
         </div>
         <div class="user-info">
             <span id="user-role">Perfil: Visitante (No Autenticado)</span>
@@ -39,11 +59,22 @@
     </section>
 
     <main class="main-container">
+
+        <!-- PANEL EXCLUSIVO DE ADMINISTRADOR (Se oculta para Analistas) -->
+        <section id="admin-control-panel" class="admin-panel-card admin-only full-width">
+            <h2 style="color: #e63946; margin-bottom: 10px;">⚙️ Panel de Control Avanzado (Exclusivo Administrador SOC)</h2>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <button onclick="showToast('Sincronización forzada con SQL Server completada.', 'success')" class="btn-primary" style="background: #e63946; flex: 1;">⚡ Forzar Backup DB SQL</button>
+                <button onclick="showToast('Logs de auditoría exportados exitosamente.', 'success')" class="btn-primary" style="background: #e63946; flex: 1;">📥 Exportar Logs Auditables</button>
+                <button onclick="showToast('Modo de Alerta Máxima activado en el WAF.', 'error')" class="btn-primary" style="background: #d62828; flex: 1;">🚨 Elevar Estado a Nivel Crítico</button>
+            </div>
+        </section>
+
         <!-- Formulario 1: Autenticación / Registro con Pestañas -->
         <section class="card">
             <div class="tab-header">
                 <button class="tab-btn active" onclick="switchTab('login')">Iniciar Sesión</button>
-                <button class="tab-btn" onclick="switchTab('register')">Crear Cuenta</button>
+                <button id="tab-btn-register" class="tab-btn admin-only" onclick="switchTab('register')">Crear Cuenta (Admin)</button>
             </div>
 
             <!-- Tab Iniciar Sesión -->
@@ -61,7 +92,7 @@
                 </form>
             </div>
 
-            <!-- Tab Crear Cuenta -->
+            <!-- Tab Crear Cuenta (Solo visible si es Admin) -->
             <div id="tab-register" class="tab-content">
                 <form id="register-form">
                     <div class="form-group">
@@ -79,9 +110,8 @@
                     <div class="form-group">
                         <label for="reg-rol">Rol asignado:</label>
                         <select id="reg-rol">
-                            <option value="Analista SOC Level 1">Analista SOC Level 1</option>
-                            <option value="Ingeniero de Ciberseguridad">Ingeniero de Ciberseguridad</option>
-                            <option value="Auditor de Seguridad">Auditor de Seguridad</option>
+                            <option value="Analista">Analista</option>
+                            <option value="Administrador">Administrador</option>
                         </select>
                     </div>
                     <button type="submit" class="btn-primary" style="background-color: var(--accent-cyan); color: #000;">Registrar Nueva Cuenta</button>
@@ -123,8 +153,8 @@
             </form>
         </section>
 
-        <!-- Formulario 3: Recuperación -->
-        <section class="card">
+        <!-- Formulario 3: Recuperación (Solo para Administradores) -->
+        <section id="card-recovery" class="card admin-only">
             <h2>Recuperación de Credenciales</h2>
             <form id="recover-form">
                 <div class="form-group">
@@ -151,6 +181,27 @@
         const socket = io();
         let rolUsuarioActual = 'Visitante';
 
+        function aplicarPermisosUI() {
+            const adminElements = document.querySelectorAll('.admin-only');
+            const modeBadge = document.getElementById('mode-badge');
+
+            if (rolUsuarioActual === 'Administrador') {
+                // Mostrar herramientas exclusivas de Admin
+                adminElements.forEach(el => el.style.display = 'block');
+                if (modeBadge) {
+                    modeBadge.className = 'badge-mode admin-badge';
+                    modeBadge.innerText = 'Modo: Administrador (FULL CRUD + DELETE)';
+                }
+            } else {
+                // Ocultar herramientas de Admin para Analistas
+                adminElements.forEach(el => el.style.display = 'none');
+                if (modeBadge) {
+                    modeBadge.className = 'badge-mode analyst-badge';
+                    modeBadge.innerText = rolUsuarioActual === 'Analista' ? 'Modo: Analista (Solo Ingesta / Lectura)' : 'Modo: Visitante (Sin Autenticar)';
+                }
+            }
+        }
+
         // Alternar Pestañas (Tabs)
         function switchTab(tabName) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -160,7 +211,7 @@
                 document.querySelectorAll('.tab-btn')[0].classList.add('active');
                 document.getElementById('tab-login').classList.add('active');
             } else {
-                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                document.getElementById('tab-btn-register').classList.add('active');
                 document.getElementById('tab-register').classList.add('active');
             }
         }
@@ -182,7 +233,6 @@
             }, 4000);
         }
 
-        // Cargar incidentes iniciales desde la API REST
         async function loadIncidents() {
             try {
                 const res = await fetch('/api/v1/incidentes');
@@ -213,8 +263,7 @@
                 const isCritical = inc.severidad === 'Crítica';
                 const fecha = inc.fecha_registro ? new Date(inc.fecha_registro).toLocaleTimeString() : new Date().toLocaleTimeString();
 
-                // Mostrar u ocultar botón de borrar según rol (RBAC)
-                const mostrarBotonEliminar = (rolUsuarioActual === 'Administrador');
+                const esAdmin = (rolUsuarioActual === 'Administrador');
 
                 const li = document.createElement('li');
                 li.className = `incident-item ${isCritical ? 'critical' : 'high'}`;
@@ -231,14 +280,13 @@
                         <div style="font-size: 0.75rem; color: var(--text-muted);">
                             ${fecha}
                         </div>
-                        ${mostrarBotonEliminar ? `<button onclick="eliminarIncidente('${idMostrada}')" style="background: #e63946; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-top: 4px;">🗑️ Eliminar</button>` : ''}
+                        ${esAdmin ? `<button onclick="eliminarIncidente('${idMostrada}')" style="background: #e63946; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold; margin-top: 4px;">🗑️ Eliminar Incidente</button>` : ''}
                     </div>
                 `;
                 list.appendChild(li);
             });
         }
 
-        // Función para eliminar incidente (Solo Admin)
         async function eliminarIncidente(id) {
             if (rolUsuarioActual !== 'Administrador') {
                 showToast('Acceso denegado: Se requieren permisos de Administrador.', 'error');
@@ -260,16 +308,16 @@
             }
         }
 
-        // Escuchar recepción en tiempo real vía WebSockets
+        // WebSockets
         socket.on('nuevo_incidente', () => loadIncidents());
         socket.on('incidente_actualizado', () => loadIncidents());
         socket.on('incidente_eliminado', () => loadIncidents());
 
-        // Control de Formularios y Eventos DOM
         document.addEventListener('DOMContentLoaded', () => {
+            aplicarPermisosUI();
             loadIncidents();
 
-            // Formulario de Ingesta de Incidentes
+            // Formulario Incidente
             const incidentForm = document.getElementById('incident-form');
             if (incidentForm) {
                 incidentForm.addEventListener('submit', async (e) => {
@@ -298,7 +346,7 @@
                 });
             }
 
-            // Formulario de Inicio de Sesión (RBAC)
+            // Formulario Login
             const loginForm = document.getElementById('login-form');
             if (loginForm) {
                 loginForm.addEventListener('submit', async (e) => {
@@ -323,7 +371,7 @@
                             showToast(`Sesión iniciada: Bienvenido ${userNombre}`, 'success');
                             document.getElementById('user-role').textContent = `Perfil: ${userNombre} (${rolUsuarioActual})`;
                             
-                            // Re-renderizar la lista para aplicar restricciones de interfaz (RBAC)
+                            aplicarPermisosUI();
                             loadIncidents();
                         } else {
                             showToast(data.message || 'Error de credenciales', 'error');
@@ -334,7 +382,7 @@
                 });
             }
 
-            // Formulario de Crear Cuenta (Registro)
+            // Formulario Registro
             const registerForm = document.getElementById('register-form');
             if (registerForm) {
                 registerForm.addEventListener('submit', async (e) => {
@@ -355,15 +403,8 @@
                         const data = await res.json();
 
                         if (res.ok) {
-                            const nombreRegistrado = data.usuario ? data.usuario.nombre : nombre;
-                            rolUsuarioActual = data.usuario ? data.usuario.rol : 'Analista';
-
-                            showToast(`Cuenta creada exitosamente para ${nombreRegistrado}`, 'success');
-                            document.getElementById('user-role').textContent = `Perfil: ${nombreRegistrado} (${rolUsuarioActual})`;
+                            showToast(`Cuenta creada exitosamente`, 'success');
                             switchTab('login');
-                            document.getElementById('email').value = email;
-
-                            loadIncidents();
                         } else {
                             showToast(data.message || 'Error al registrar', 'error');
                         }
@@ -372,23 +413,13 @@
                     }
                 });
             }
-
-            // Formulario de Recuperación
-            const recoverForm = document.getElementById('recover-form');
-            if (recoverForm) {
-                recoverForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    const email = document.getElementById('recover-email').value.trim();
-                    showToast(`Token de restablecimiento SMTP enviado a ${email}`, 'success');
-                    document.getElementById('recover-email').value = '';
-                });
-            }
         });
 
         function cerrarSesion() {
             rolUsuarioActual = 'Visitante';
             document.getElementById('user-role').textContent = 'Perfil: Visitante (No Autenticado)';
             showToast('Sesión finalizada en el SOC.', 'info');
+            aplicarPermisosUI();
             loadIncidents();
         }
     </script>
