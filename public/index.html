@@ -19,28 +19,6 @@
             margin-left: 10px;
         }
 
-        .system-panel-card {
-            background: #131a26;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 20px;
-        }
-
-        .btn-action-sober {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: #e0e6ed;
-            padding: 8px 14px;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            cursor: pointer;
-        }
-
-        .btn-action-sober:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
         .btn-delete-sober {
             background: rgba(230, 57, 70, 0.12);
             border: 1px solid rgba(230, 57, 70, 0.3);
@@ -120,7 +98,7 @@
         </div>
     </header>
 
-    <!-- ACCESO INICIAL (Solo visible si no está autenticado) -->
+    <!-- ACCESO INICIAL -->
     <div id="section-gate" class="login-gateway">
         <section class="card">
             <h2 style="text-align: center; margin-bottom: 20px;">Plataforma SOC - Autenticación</h2>
@@ -141,7 +119,7 @@
         </section>
     </div>
 
-    <!-- CONTENIDO PRINCIPAL (Protegido por Autenticación) -->
+    <!-- CONTENIDO PRINCIPAL -->
     <div id="section-workspace" class="auth-hidden" style="max-width: 1200px; margin: 20px auto; padding: 0 15px;">
 
         <!-- Metrics Dashboard -->
@@ -164,17 +142,7 @@
             </div>
         </section>
 
-        <!-- PANEL DE MANTENIMIENTO SOBRIO (Solo Administrador) -->
-        <section id="admin-management-panel" class="system-panel-card admin-only">
-            <h3 style="margin: 0 0 12px 0; font-weight: 500;">Gestión e Infraestructura del Sistema</h3>
-            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                <button onclick="showToast('Respaldo de Base de Datos generado.', 'success')" class="btn-action-sober">Respaldo DB SQL</button>
-                <button onclick="showToast('Logs exportados en formato CSV.', 'success')" class="btn-action-sober">Exportar Auditoría</button>
-                <button onclick="showToast('Sincronización con nodos completada.', 'info')" class="btn-action-sober">Sincronizar Agentes</button>
-            </div>
-        </section>
-
-        <!-- FORMULARIOS OPERATIVOS (3 COLUMNAS) -->
+        <!-- FORMULARIO OPERATIVO (3 COLUMNAS) -->
         <div class="forms-grid-3">
 
             <!-- FORMULARIO 1: Ingesta de Incidentes -->
@@ -211,9 +179,9 @@
                 </form>
             </section>
 
-            <!-- FORMULARIO 2: Alta de Usuarios (Visible en Admin) -->
+            <!-- FORMULARIO 2: Alta de Usuarios -->
             <section class="card">
-                <h2>Crear Usuario SOC</h2>
+                <h2>Gestión de Usuarios SOC</h2>
                 <form id="register-form">
                     <div class="form-group">
                         <label for="reg-nombre">Nombre Completo:</label>
@@ -252,8 +220,16 @@
 
         </div>
 
-        <!-- TABLA CRUD DE GESTIÓN DE USUARIOS (Solo visible para Administrador) -->
-        <section class="card full-width admin-only" style="margin-bottom: 20px;">
+        <!-- PANEL DE EVENTOS EN TIEMPO REAL -->
+        <section class="card full-width" style="margin-bottom: 20px;">
+            <h2>Eventos Registrados en Tiempo Real</h2>
+            <ul id="incident-list" class="data-list">
+                <li>Cargando registros...</li>
+            </ul>
+        </section>
+
+        <!-- TABLA DE USUARIOS REGISTRADOS (Abajo de eventos - Solo visible para Administrador) -->
+        <section class="card full-width admin-only">
             <h2>Panel de Usuarios Registrados (Gestión CRUD & Bloqueos)</h2>
             <table class="user-table">
                 <thead>
@@ -269,14 +245,6 @@
                     <!-- Carga dinámica -->
                 </tbody>
             </table>
-        </section>
-
-        <!-- PANEL DE EVENTOS EN TIEMPO REAL -->
-        <section class="card full-width">
-            <h2>Eventos Registrados en Tiempo Real</h2>
-            <ul id="incident-list" class="data-list">
-                <li>Cargando registros...</li>
-            </ul>
         </section>
 
     </div>
