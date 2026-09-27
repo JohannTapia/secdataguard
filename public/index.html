@@ -8,7 +8,7 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         .auth-hidden { display: none !important; }
-        .admin-only { display: none; }
+        .admin-only { display: none !important; }
         
         .profile-tag {
             font-size: 0.75rem;
@@ -46,6 +46,30 @@
             padding: 20px;
         }
 
+        /* Ajuste de margen y separacion */
+        .metrics-container {
+            margin-bottom: 30px !important;
+        }
+
+        .forms-layout {
+            display: grid;
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        /* Layout dinámico según rol */
+        .forms-layout.admin-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .forms-layout.analyst-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .card {
+            margin-bottom: 0;
+        }
+
         .user-table {
             width: 100%;
             border-collapse: collapse;
@@ -72,15 +96,8 @@
         .status-active { background: rgba(46, 196, 182, 0.15); color: #2ec4b6; }
         .status-blocked { background: rgba(230, 57, 70, 0.15); color: #e63946; }
 
-        .forms-grid-3 {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
         @media (max-width: 900px) {
-            .forms-grid-3 {
+            .forms-layout.admin-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -120,9 +137,9 @@
     </div>
 
     <!-- CONTENIDO PRINCIPAL -->
-    <div id="section-workspace" class="auth-hidden" style="max-width: 1200px; margin: 20px auto; padding: 0 15px;">
+    <div id="section-workspace" class="auth-hidden" style="max-width: 1200px; margin: 30px auto; padding: 0 20px;">
 
-        <!-- Metrics Dashboard -->
+        <!-- Dashboard de Métricas -->
         <section class="metrics-container">
             <div class="metric-card">
                 <h3>Estado del SOC</h3>
@@ -142,10 +159,10 @@
             </div>
         </section>
 
-        <!-- FORMULARIO OPERATIVO (3 COLUMNAS) -->
-        <div class="forms-grid-3">
+        <!-- CONTENEDOR DE FORMULARIOS OPERATIVOS -->
+        <div id="forms-wrapper" class="forms-layout">
 
-            <!-- FORMULARIO 1: Ingesta de Incidentes -->
+            <!-- FORMULARIO 1: Ingesta de Incidentes (Analista & Admin) -->
             <section class="card">
                 <h2>Registrar Nuevo Incidente</h2>
                 <form id="incident-form">
@@ -179,8 +196,8 @@
                 </form>
             </section>
 
-            <!-- FORMULARIO 2: Alta de Usuarios -->
-            <section class="card">
+            <!-- FORMULARIO 2: Alta de Usuarios (EXCLUSIVO ADMINISTRADOR) -->
+            <section class="card admin-only">
                 <h2>Gestión de Usuarios SOC</h2>
                 <form id="register-form">
                     <div class="form-group">
@@ -206,30 +223,18 @@
                 </form>
             </section>
 
-            <!-- FORMULARIO 3: Recuperación de Credenciales -->
-            <section class="card">
-                <h2>Recuperación de Accesos</h2>
-                <form id="recover-form">
-                    <div class="form-group">
-                        <label for="recover-email">Correo Corporativo:</label>
-                        <input type="email" id="recover-email" required placeholder="usuario@empresa.cl">
-                    </div>
-                    <button type="submit" class="btn-secondary" style="width: 100%; margin-top: 15px;">Solicitar Restablecimiento</button>
-                </form>
-            </section>
-
         </div>
 
-        <!-- PANEL DE EVENTOS EN TIEMPO REAL -->
-        <section class="card full-width" style="margin-bottom: 20px;">
+        <!-- EVENTOS REGISTRADOS -->
+        <section class="card full-width" style="margin-bottom: 30px;">
             <h2>Eventos Registrados en Tiempo Real</h2>
             <ul id="incident-list" class="data-list">
                 <li>Cargando registros...</li>
             </ul>
         </section>
 
-        <!-- TABLA DE USUARIOS REGISTRADOS (Abajo de eventos - Solo visible para Administrador) -->
-        <section class="card full-width admin-only">
+        <!-- TABLA DE USUARIOS (EXCLUSIVO ADMINISTRADOR) -->
+        <section class="card full-width admin-only" style="margin-bottom: 30px;">
             <h2>Panel de Usuarios Registrados (Gestión CRUD & Bloqueos)</h2>
             <table class="user-table">
                 <thead>
@@ -332,6 +337,8 @@
             const btnLogout = document.getElementById('btn-logout');
             const profileTag = document.getElementById('header-profile-tag');
             const userRoleText = document.getElementById('user-role-text');
+            const formsWrapper = document.getElementById('forms-wrapper');
+
             const adminElements = document.querySelectorAll('.admin-only');
 
             if (!usuarioSesion) {
@@ -349,9 +356,24 @@
                 userRoleText.textContent = `Perfil: ${usuarioSesion.rol}`;
 
                 const esAdmin = usuarioSesion.rol === 'Administrador';
-                adminElements.forEach(el => el.style.display = esAdmin ? 'block' : 'none');
+                
+                // Mostrar/ocultar elementos de Admin
+                adminElements.forEach(el => {
+                    if (esAdmin) {
+                        el.style.setProperty('display', 'block', 'important');
+                    } else {
+                        el.style.setProperty('display', 'none', 'important');
+                    }
+                });
 
-                if (esAdmin) cargarUsuariosAPI();
+                // Ajustar grilla de formularios
+                if (esAdmin) {
+                    formsWrapper.className = 'forms-layout admin-grid';
+                    cargarUsuariosAPI();
+                } else {
+                    formsWrapper.className = 'forms-layout analyst-grid';
+                }
+
                 loadIncidents();
             }
         }
@@ -521,14 +543,6 @@
                 } catch (err) {
                     showToast('Error de conexión.', 'error');
                 }
-            });
-
-            // Form Recuperación
-            document.getElementById('recover-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const email = document.getElementById('recover-email').value.trim();
-                showToast(`Solicitud enviada a ${email}`, 'success');
-                document.getElementById('recover-email').value = '';
             });
         });
 
