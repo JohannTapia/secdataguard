@@ -7,47 +7,42 @@
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        /* Clases de control de visibilidad RBAC */
         .auth-hidden { display: none !important; }
         .admin-only { display: none; }
         
-        /* Estilos sobrios para badges y paneles */
         .profile-tag {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             padding: 3px 8px;
-            border-radius: 3px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: var(--text-muted, #888);
-            margin-left: 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.06);
+            color: #888;
+            margin-left: 10px;
         }
 
         .system-panel-card {
-            background: var(--bg-card, #121824);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: #131a26;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             padding: 16px;
             margin-bottom: 20px;
         }
 
         .btn-action-sober {
-            background: rgba(255, 255, 255, 0.04);
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.15);
-            color: #eceff4;
+            color: #e0e6ed;
             padding: 8px 14px;
             border-radius: 4px;
             font-size: 0.85rem;
             cursor: pointer;
-            transition: all 0.2s ease;
         }
 
         .btn-action-sober:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .btn-delete-sober {
-            background: rgba(230, 57, 70, 0.1);
+            background: rgba(230, 57, 70, 0.12);
             border: 1px solid rgba(230, 57, 70, 0.3);
             color: #e63946;
             padding: 4px 10px;
@@ -56,14 +51,60 @@
             cursor: pointer;
         }
 
-        .btn-delete-sober:hover {
-            background: rgba(230, 57, 70, 0.25);
+        .btn-block-sober {
+            background: rgba(255, 159, 28, 0.12);
+            border: 1px solid rgba(255, 159, 28, 0.3);
+            color: #ff9f1c;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            margin-right: 4px;
         }
 
-        /* Centrado de Login inicial */
         .login-gateway {
             max-width: 420px;
-            margin: 60px auto;
+            margin: 80px auto;
+            padding: 20px;
+        }
+
+        .user-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.85rem;
+        }
+
+        .user-table th, .user-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .user-table th {
+            color: #888;
+            font-weight: 500;
+        }
+
+        .status-badge {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+        }
+        .status-active { background: rgba(46, 196, 182, 0.15); color: #2ec4b6; }
+        .status-blocked { background: rgba(230, 57, 70, 0.15); color: #e63946; }
+
+        .forms-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .forms-grid-3 {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -82,7 +123,7 @@
     <!-- ACCESO INICIAL (Solo visible si no está autenticado) -->
     <div id="section-gate" class="login-gateway">
         <section class="card">
-            <h2 style="text-align: center; margin-bottom: 20px;">Acceso a la Plataforma SOC</h2>
+            <h2 style="text-align: center; margin-bottom: 20px;">Plataforma SOC - Autenticación</h2>
             <form id="gate-login-form">
                 <div class="form-group">
                     <label for="gate-email">Correo Corporativo:</label>
@@ -94,24 +135,24 @@
                 </div>
                 <button type="submit" class="btn-primary" style="width: 100%;">Iniciar Sesión</button>
             </form>
-            <p style="font-size: 0.8rem; color: #666; text-align: center; margin-top: 15px;">
-                Cuentas de prueba: <code>analista@secdataguard.cl</code> | <code>admin@secdataguard.cl</code>
+            <p style="font-size: 0.8rem; color: #777; text-align: center; margin-top: 15px;">
+                Cuentas: <code>analista@secdataguard.cl</code> | <code>admin@secdataguard.cl</code>
             </p>
         </section>
     </div>
 
-    <!-- CONTENIDO PRINCIPAL (Protegido por autenticación) -->
-    <div id="section-workspace" class="auth-hidden">
+    <!-- CONTENIDO PRINCIPAL (Protegido por Autenticación) -->
+    <div id="section-workspace" class="auth-hidden" style="max-width: 1200px; margin: 20px auto; padding: 0 15px;">
 
         <!-- Metrics Dashboard -->
         <section class="metrics-container">
             <div class="metric-card">
                 <h3>Estado del SOC</h3>
-                <div class="number" style="color: var(--success);">ONLINE</div>
+                <div class="number" style="color: var(--success, #2ec4b6);">ONLINE</div>
             </div>
             <div class="metric-card">
                 <h3>Nivel de Riesgo</h3>
-                <div class="number" style="color: var(--warning);">MEDIO</div>
+                <div class="number" style="color: var(--warning, #ff9f1c);">MEDIO</div>
             </div>
             <div class="metric-card">
                 <h3>Incidentes Activos</h3>
@@ -119,32 +160,33 @@
             </div>
             <div class="metric-card">
                 <h3>Sensores Conectados</h3>
-                <div class="number" style="color: var(--accent-cyan);">14/14</div>
+                <div class="number" style="color: #00b4d8;">14/14</div>
             </div>
         </section>
 
-        <main class="main-container">
+        <!-- PANEL DE MANTENIMIENTO SOBRIO (Solo Administrador) -->
+        <section id="admin-management-panel" class="system-panel-card admin-only">
+            <h3 style="margin: 0 0 12px 0; font-weight: 500;">Gestión e Infraestructura del Sistema</h3>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button onclick="showToast('Respaldo de Base de Datos generado.', 'success')" class="btn-action-sober">Respaldo DB SQL</button>
+                <button onclick="showToast('Logs exportados en formato CSV.', 'success')" class="btn-action-sober">Exportar Auditoría</button>
+                <button onclick="showToast('Sincronización con nodos completada.', 'info')" class="btn-action-sober">Sincronizar Agentes</button>
+            </div>
+        </section>
 
-            <!-- PANEL ADMINISTRATIVO SOBRIO (Solo Administrador) -->
-            <section id="admin-management-panel" class="system-panel-card admin-only full-width">
-                <h3 style="margin-bottom: 12px; font-weight: 500; color: #eceff4;">Gestión de Sistema y Mantenimiento</h3>
-                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                    <button onclick="showToast('Copia de seguridad ejecutada.', 'success')" class="btn-action-sober">Respaldo DB SQL</button>
-                    <button onclick="showToast('Auditoría exportada en formato CSV.', 'success')" class="btn-action-sober">Exportar Registros</button>
-                    <button onclick="showToast('Sincronización de agentes de red iniciada.', 'info')" class="btn-action-sober">Sincronizar Nodos</button>
-                </div>
-            </section>
+        <!-- FORMULARIOS OPERATIVOS (3 COLUMNAS) -->
+        <div class="forms-grid-3">
 
-            <!-- FORMULARIO 1: Ingesta de Incidentes (Analista & Admin) -->
+            <!-- FORMULARIO 1: Ingesta de Incidentes -->
             <section class="card">
                 <h2>Registrar Nuevo Incidente</h2>
                 <form id="incident-form">
                     <div class="form-group">
                         <label for="titulo">Título de la Amenaza:</label>
-                        <input type="text" id="titulo" required placeholder="Ej. Intento de Inyección SQL detectado">
+                        <input type="text" id="titulo" required placeholder="Ej. Inyección SQL detectada">
                     </div>
                     <div class="form-group">
-                        <label for="categoria">Categoría de Amenaza:</label>
+                        <label for="categoria">Categoría:</label>
                         <select id="categoria" required>
                             <option value="Fuerza Bruta">Fuerza Bruta</option>
                             <option value="Inyección SQL">Inyección SQL</option>
@@ -153,7 +195,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="severidad">Nivel de Severidad:</label>
+                        <label for="severidad">Severidad:</label>
                         <select id="severidad" required>
                             <option value="Crítica">Crítica</option>
                             <option value="Alta" selected>Alta</option>
@@ -163,15 +205,15 @@
                     </div>
                     <div class="form-group">
                         <label for="descripcion">Detalle Técnico:</label>
-                        <textarea id="descripcion" rows="2" required placeholder="Describa el vector de ataque..."></textarea>
+                        <textarea id="descripcion" rows="2" required placeholder="Vector de ataque..."></textarea>
                     </div>
-                    <button type="submit" class="btn-primary">Registrar Evento</button>
+                    <button type="submit" class="btn-primary" style="width: 100%;">Registrar Evento</button>
                 </form>
             </section>
 
-            <!-- FORMULARIO 2: Crear Cuenta / Gestión de Usuarios (Solo Administrador) -->
-            <section id="admin-user-card" class="card admin-only">
-                <h2>Gestión de Usuarios SOC</h2>
+            <!-- FORMULARIO 2: Alta de Usuarios (Visible en Admin) -->
+            <section class="card">
+                <h2>Crear Usuario SOC</h2>
                 <form id="register-form">
                     <div class="form-group">
                         <label for="reg-nombre">Nombre Completo:</label>
@@ -192,7 +234,7 @@
                             <option value="Administrador">Administrador SOC</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn-primary">Crear Cuenta</button>
+                    <button type="submit" class="btn-primary" style="width: 100%;">Crear Cuenta</button>
                 </form>
             </section>
 
@@ -204,18 +246,38 @@
                         <label for="recover-email">Correo Corporativo:</label>
                         <input type="email" id="recover-email" required placeholder="usuario@empresa.cl">
                     </div>
-                    <button type="submit" class="btn-secondary" style="width: 100%;">Solicitar Restablecimiento</button>
+                    <button type="submit" class="btn-secondary" style="width: 100%; margin-top: 15px;">Solicitar Restablecimiento</button>
                 </form>
             </section>
 
-            <!-- PANEL DE EVENTOS EN TIEMPO REAL -->
-            <section class="card full-width">
-                <h2>Eventos Registrados en Tiempo Real</h2>
-                <ul id="incident-list" class="data-list">
-                    <li>Cargando registros...</li>
-                </ul>
-            </section>
-        </main>
+        </div>
+
+        <!-- TABLA CRUD DE GESTIÓN DE USUARIOS (Solo visible para Administrador) -->
+        <section class="card full-width admin-only" style="margin-bottom: 20px;">
+            <h2>Panel de Usuarios Registrados (Gestión CRUD & Bloqueos)</h2>
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>Usuario / Nombre</th>
+                        <th>Correo Electrónico</th>
+                        <th>Rol</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="user-table-body">
+                    <!-- Carga dinámica -->
+                </tbody>
+            </table>
+        </section>
+
+        <!-- PANEL DE EVENTOS EN TIEMPO REAL -->
+        <section class="card full-width">
+            <h2>Eventos Registrados en Tiempo Real</h2>
+            <ul id="incident-list" class="data-list">
+                <li>Cargando registros...</li>
+            </ul>
+        </section>
 
     </div>
 
@@ -226,6 +288,76 @@
         const socket = io();
         let usuarioSesion = null;
 
+        async function cargarUsuariosAPI() {
+            try {
+                const res = await fetch('/api/v1/usuarios');
+                const usuarios = await res.json();
+                renderUserTable(usuarios);
+            } catch (err) {
+                console.error('Error al cargar usuarios:', err);
+            }
+        }
+
+        function renderUserTable(usuarios) {
+            const tbody = document.getElementById('user-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            usuarios.forEach(user => {
+                const tr = document.createElement('tr');
+                const esBloqueado = user.estado === 'Bloqueado';
+
+                tr.innerHTML = `
+                    <td><strong>${user.nombre}</strong></td>
+                    <td style="color:#aaa;">${user.email}</td>
+                    <td>${user.rol}</td>
+                    <td>
+                        <span class="status-badge ${esBloqueado ? 'status-blocked' : 'status-active'}">
+                            ${user.estado || 'Activo'}
+                        </span>
+                    </td>
+                    <td>
+                        <button onclick="toggleEstadoUsuario(${user.usuario_id}, '${esBloqueado ? 'Activo' : 'Bloqueado'}')" class="btn-block-sober">
+                            ${esBloqueado ? 'Desbloquear' : 'Bloquear'}
+                        </button>
+                        <button onclick="eliminarUsuario(${user.usuario_id})" class="btn-delete-sober">
+                            Eliminar
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function toggleEstadoUsuario(id, nuevoEstado) {
+            try {
+                const res = await fetch(`/api/v1/usuarios/${id}/estado`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ estado: nuevoEstado })
+                });
+                if (res.ok) {
+                    showToast(`Estado cambiado a ${nuevoEstado}`, 'success');
+                    cargarUsuariosAPI();
+                }
+            } catch (err) {
+                showToast('Error al actualizar estado.', 'error');
+            }
+        }
+
+        async function eliminarUsuario(id) {
+            if (!confirm(`¿Eliminar al usuario ID #${id}?`)) return;
+            try {
+                const res = await fetch(`/api/v1/usuarios/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    showToast('Usuario eliminado del sistema.', 'success');
+                    cargarUsuariosAPI();
+                }
+            } catch (err) {
+                showToast('Error al eliminar usuario.', 'error');
+            }
+        }
+
         function renderUI() {
             const gate = document.getElementById('section-gate');
             const workspace = document.getElementById('section-workspace');
@@ -235,14 +367,12 @@
             const adminElements = document.querySelectorAll('.admin-only');
 
             if (!usuarioSesion) {
-                // Estado 1: No Autenticado (Página limpia)
                 gate.classList.remove('auth-hidden');
                 workspace.classList.add('auth-hidden');
                 btnLogout.classList.add('auth-hidden');
                 profileTag.textContent = 'No Autenticado';
                 userRoleText.textContent = 'Estado: Sesión requerida';
             } else {
-                // Estado 2: Autenticado
                 gate.classList.add('auth-hidden');
                 workspace.classList.remove('auth-hidden');
                 btnLogout.classList.remove('auth-hidden');
@@ -253,6 +383,7 @@
                 const esAdmin = usuarioSesion.rol === 'Administrador';
                 adminElements.forEach(el => el.style.display = esAdmin ? 'block' : 'none');
 
+                if (esAdmin) cargarUsuariosAPI();
                 loadIncidents();
             }
         }
@@ -263,8 +394,8 @@
             
             const toast = document.createElement('div');
             toast.className = 'toast';
-            if (type === 'error') toast.style.borderColor = 'var(--danger)';
-            if (type === 'success') toast.style.borderColor = 'var(--success)';
+            if (type === 'error') toast.style.borderColor = 'var(--danger, #e63946)';
+            if (type === 'success') toast.style.borderColor = 'var(--success, #2ec4b6)';
             toast.innerHTML = `<strong>SecDataGuard:</strong> ${message}`;
             container.appendChild(toast);
 
@@ -307,13 +438,13 @@
                 li.innerHTML = `
                     <div>
                         <strong>[ID #${idMostrada}] ${inc.titulo}</strong>
-                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                        <div style="font-size: 0.85rem; color: #888; margin-top: 4px;">
                             ${inc.descripcion} | <em>Cat: ${inc.categoria || 'General'}</em>
                         </div>
                     </div>
                     <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
                         <span class="badge ${isCritical ? 'badge-critical' : 'badge-high'}">${inc.severidad || 'Alta'}</span>
-                        <div style="font-size: 0.75rem; color: var(--text-muted);">${fecha}</div>
+                        <div style="font-size: 0.75rem; color: #888;">${fecha}</div>
                         ${esAdmin ? `<button onclick="eliminarIncidente('${idMostrada}')" class="btn-delete-sober">Eliminar</button>` : ''}
                     </div>
                 `;
@@ -411,10 +542,11 @@
                     });
 
                     if (res.ok) {
-                        showToast(`Usuario ${nombre} registrado con éxito.`, 'success');
+                        showToast(`Usuario ${nombre} creado con éxito.`, 'success');
                         document.getElementById('reg-nombre').value = '';
                         document.getElementById('reg-email').value = '';
                         document.getElementById('reg-password').value = '';
+                        cargarUsuariosAPI();
                     } else {
                         showToast('Error al registrar usuario.', 'error');
                     }
